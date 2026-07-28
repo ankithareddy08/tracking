@@ -4,7 +4,13 @@ const express = require('express');
 const { UAParser } = require('ua-parser-js');
 
 const db = require('../db');
-const { detectSource, isBot, isChannel } = require('../channels');
+const {
+  detectSource,
+  isBot,
+  isChannel,
+  crawlerApp,
+  attributeFromPreviews,
+} = require('../channels');
 const { withUtmTags } = require('../url');
 const { probeToken } = require('../token');
 
@@ -64,8 +70,25 @@ router.get('/:code', async (req, res, next) => {
   const queryTag = typeof req.query.s === 'string' ? req.query.s.toLowerCase() : null;
   const taggedChannel = link.channel || (queryTag && isChannel(queryTag) ? queryTag : null);
 
-  const detected = detectSource({ taggedChannel, referrer, userAgent, secFetchSite });
+  let detected = detectSource({ taggedChannel, referrer, userAgent, secFetchSite });
   const bot = isBot(userAgent);
+
+  if (bot) {
+    // Record which app's crawler this is. The hit stays excluded from every
+    // headline number, but it is the only evidence that this link was shared in
+    // that app at all — attributeFromPreviews() reads it back below.
+    const app = crawlerApp(userAgent);
+    if (app) detected = { ...detected, source: app, method: 'crawler', confidence: 'exact' };
+  } else if (!detected.conclusive) {
+    // Nothing in the request identifies the source, which is the normal case for
+    // WhatsApp/Telegram desktop. Fall back to "who previewed this link".
+    try {
+      const fromPreview = attributeFromPreviews(await db.previewAppsForLink(link.id));
+      if (fromPreview) detected = { ...detected, ...fromPreview };
+    } catch (err) {
+      console.error(`[redirect] preview lookup failed for ${code}:`, err.message);
+    }
+  }
 
   let clickId = null;
   try {

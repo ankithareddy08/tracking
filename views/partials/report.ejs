@@ -21,6 +21,8 @@
               <span class="badge partial" title="Detected from the referrer or the in-app browser signature">detected</span>
             <% } else if (s.reliableShare > 0) { %>
               <span class="badge partial" title="<%= s.reliableShare %>% detected from a solid signal, the rest is a weaker guess"><%= s.reliableShare %>% solid</span>
+            <% } else if (s.likelyShare > 0) { %>
+              <span class="badge inferred" title="These clicks carried no signal. Attributed to this app because it is the only one that generated a link preview — a strong hint, but not proof.">likely</span>
             <% } else { %>
               <span class="badge inferred" title="No identifying signal — this is where undetectable traffic lands">no signal</span>
             <% } %>
@@ -133,6 +135,7 @@
                      'user-agent':      ['partial',  'in-app browser'],
                      'client-referrer': ['partial',  'browser referrer'],
                      'client-webview':  ['partial',  'webview detected'],
+                     'preview-match':   ['inferred', 'likely — app preview'],
                      'sec-fetch':       ['inferred', 'unnamed website'],
                    };
                    const badge = methodBadges[c.source_method] || ['inferred', 'no signal']; %>

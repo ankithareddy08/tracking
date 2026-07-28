@@ -226,6 +226,25 @@ async function recordClick(click) {
   return Number(result.lastInsertRowid);
 }
 
+/**
+ * Which apps' preview crawlers have fetched this link. Feeds
+ * attributeFromPreviews() so a signal-less click can still be traced back to
+ * the chat app it was most likely shared in.
+ *
+ * @returns {Promise<string[]>} distinct channel ids
+ */
+async function previewAppsForLink(linkId) {
+  const { rows } = await query(
+    `SELECT DISTINCT source
+       FROM clicks
+      WHERE link_id = @link_id
+        AND is_bot = 1
+        AND source_method = 'crawler'`,
+    { link_id: linkId }
+  );
+  return rows.map((r) => r.source);
+}
+
 // `refined = 0` makes this idempotent: a replayed or duplicated beacon cannot
 // rewrite an already-refined row, and the WHERE guard means a probe can only
 // ever upgrade a visit we ourselves classified as inconclusive.
@@ -297,7 +316,8 @@ async function sourceBreakdown(groupId = null) {
        COUNT(*)                     AS clicks,
        COUNT(DISTINCT visitor_hash) AS visitors,
        SUM(CASE WHEN confidence = 'exact' THEN 1 ELSE 0 END)            AS exact,
-       SUM(CASE WHEN confidence IN ('exact', 'high') THEN 1 ELSE 0 END) AS reliable
+       SUM(CASE WHEN confidence IN ('exact', 'high') THEN 1 ELSE 0 END) AS reliable,
+       SUM(CASE WHEN source_method = 'preview-match' THEN 1 ELSE 0 END) AS likely
      FROM clicks
      WHERE ${HUMAN} AND (@group_id IS NULL OR group_id = @group_id)
      GROUP BY source
@@ -397,6 +417,7 @@ module.exports = {
   findLinksByGroup,
   recordClick,
   refineClick,
+  previewAppsForLink,
   listGroups,
   totals,
   sourceBreakdown,

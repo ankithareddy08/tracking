@@ -166,6 +166,33 @@ function isBot(userAgent) {
   return BOT_PATTERN.test(userAgent);
 }
 
+// Preview crawlers *do* announce which app they belong to, unlike the humans
+// who click afterwards. Recording that turns an otherwise useless bot hit into
+// the one clue available for desktop chat apps — see attributeFromPreviews().
+const CRAWLER_RULES = [
+  [/WhatsApp/i,                        'whatsapp'],
+  [/TelegramBot|Telegram/i,            'telegram'],
+  [/facebookexternalhit|facebookcatalog/i, 'facebook'],
+  [/Twitterbot/i,                      'twitter'],
+  [/LinkedInBot/i,                     'linkedin'],
+  [/redditbot/i,                       'reddit'],
+  [/Pinterest/i,                       'pinterest'],
+  [/Instagram/i,                       'instagram'],
+  [/SkypeUriPreview|Slackbot|Slack-ImgProxy|Discordbot/i, 'other'],
+];
+
+/**
+ * Which app's preview crawler this request is, if any.
+ * @returns {?string} channel id, or null for search engines / generic tooling.
+ */
+function crawlerApp(userAgent) {
+  if (!userAgent) return null;
+  for (const [pattern, channel] of CRAWLER_RULES) {
+    if (pattern.test(userAgent)) return channel;
+  }
+  return null;
+}
+
 /* ------------------------------------------------------------------ *
  * Attribution
  * ------------------------------------------------------------------ */
@@ -217,7 +244,9 @@ const CONFIDENCE = {
   'user-agent': 'high',
   'client-referrer': 'high',
   'client-webview': 'medium',
+  'preview-match': 'low',
   'sec-fetch': 'low',
+  crawler: 'exact', // The crawler names itself; only ever set on bot rows.
   none: 'none',
 };
 
@@ -229,9 +258,34 @@ const METHOD_LABELS = {
   'user-agent': 'Recognised in-app browser',
   'client-referrer': 'Referrer read in the browser',
   'client-webview': 'In-app webview detected in the browser',
+  'preview-match': 'Only this app generated a link preview, so the click probably came from it',
   'sec-fetch': 'Came from a website that hid its identity',
+  crawler: 'The app\'s own link-preview crawler',
   none: 'No signal available',
 };
+
+/**
+ * Last-resort attribution for clicks that carry no identifying signal at all —
+ * which is every click out of WhatsApp Desktop and Telegram Desktop, since they
+ * hand the URL to the default browser instead of opening it themselves.
+ *
+ * The trick: pasting a link into a chat app makes *that app's* crawler fetch it
+ * for the preview card, and crawlers do identify themselves. So if exactly one
+ * app has ever previewed this link, an unattributable human click on it very
+ * likely came from that app.
+ *
+ * Deliberately refuses to guess when two or more apps previewed the same link —
+ * there is no way to tell which chat the click came out of, and inventing a
+ * split would be worse than admitting it is unknown.
+ *
+ * @param {string[]} previewApps Distinct channel ids that crawled this link.
+ * @returns {?{source: string, method: string, confidence: string}}
+ */
+function attributeFromPreviews(previewApps) {
+  const candidates = [...new Set((previewApps || []).filter((a) => a && a !== 'other'))];
+  if (candidates.length !== 1) return null;
+  return { source: candidates[0], method: 'preview-match', confidence: 'low' };
+}
 
 /**
  * Resolve where a click came from, using only what the request itself carries.
@@ -337,5 +391,7 @@ module.exports = {
   channelColor,
   detectSource,
   refineFromClient,
+  attributeFromPreviews,
+  crawlerApp,
   isBot,
 };

@@ -61,6 +61,9 @@ async function buildReport(groupId = null, { days = 30 } = {}) {
     // detected from a referrer or in-app browser (reliable, but still inferred).
     exactShare: row.clicks ? Math.round((row.exact / row.clicks) * 100) : 0,
     reliableShare: row.clicks ? Math.round((row.reliable / row.clicks) * 100) : 0,
+    // Clicks with no signal of their own, attributed only because a single
+    // app previewed the link. Shown as "likely" rather than stated as fact.
+    likelyShare: row.clicks ? Math.round((row.likely / row.clicks) * 100) : 0,
   }));
 
   const totalClicks = sources.reduce((sum, s) => sum + s.clicks, 0);

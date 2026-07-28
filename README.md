@@ -49,8 +49,34 @@ interstitial.
 | `high` | Branded in-app browser User-Agent | Instagram, Facebook, TikTok, Snapchat, LinkedIn, Twitter, Pinterest, WeChat &mdash; **only when opened from that platform's own mobile app**, never its website |
 | `high` | `document.referrer` read in the browser | Webviews that drop the header but keep the JS referrer |
 | `medium` | Webview globals detected client-side | Some app, but the app did not name itself |
+| `low` | Only one app previewed this link (`preview-match`) | **WhatsApp / Telegram desktop**, and other apps that hand off to the system browser |
 | `low` | `Sec-Fetch-Site: cross-site` with no referrer | Came from *a* website that hid its identity |
-| `none` | Nothing at all | Typed the URL, a bookmark, WhatsApp on iPhone, or Instagram/Facebook web |
+| `none` | Nothing at all | Typed the URL, a bookmark, or an ambiguously-shared link |
+
+### The preview-match trick
+
+Desktop chat apps (WhatsApp Desktop, Telegram Desktop) launch the system
+browser instead of rendering the page themselves, so their clicks arrive with no
+referrer, no branded User-Agent and no webview marker — indistinguishable from
+someone typing the URL.
+
+But pasting a link into those apps makes *their* crawler fetch it for the
+preview card, and crawlers **do** identify themselves. So those bot hits get
+recorded with the app they belong to (`source_method = 'crawler'`, still
+excluded from all headline numbers), and a later signal-less click on the same
+link is attributed to that app.
+
+Two deliberate limits, both in `attributeFromPreviews()`
+([src/channels.js](src/channels.js)):
+
+- It refuses to guess when **two or more** apps previewed the same link — there
+  is no way to know which chat a click came out of, and inventing a split would
+  be worse than admitting it is unknown.
+- It is `low` confidence and labelled **"likely"** in the UI, never presented as
+  measured. A click really could have come from someone typing the URL.
+
+A real signal always wins: `preview-match` only ever fills the gap where
+detection found nothing.
 
 **Two real gaps, same root cause.**
 
@@ -63,10 +89,11 @@ interstitial.
    in-app mobile browser is detected fine. This is not a bug: `document.referrer`
    is empty in that case too, so there is genuinely nothing left to read.
 
-Both are indistinguishable from someone typing the URL, and land in `Direct` or
-`Other site`. No tracker can detect them from the request alone — anything
-claiming otherwise is guessing. Append `?s=whatsapp`, `?s=instagram`, etc. when
-you share on that platform and it becomes `exact`.
+Neither sends anything identifying, so both fall through to `preview-match` if
+exactly one app previewed the link, and otherwise land in `Direct` / `Other
+site`. No tracker can read them straight from the request — anything claiming
+otherwise is guessing. Append `?s=whatsapp`, `?s=instagram`, etc. when you share
+on that platform and it becomes `exact` instead of merely likely.
 
 Android is a partial exception for WhatsApp specifically: it sends
 `android-app://com.whatsapp` as the referrer, so WhatsApp traffic from Android is
