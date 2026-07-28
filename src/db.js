@@ -228,22 +228,24 @@ async function recordClick(click) {
 }
 
 /**
- * Which apps' preview crawlers have fetched this link. Feeds
- * attributeFromPreviews() so a signal-less click can still be traced back to
- * the chat app it was most likely shared in.
+ * Which apps' preview crawlers have fetched this link, and when each last did.
+ * Feeds attributeFromPreviews() so a signal-less click can still be traced back
+ * to the chat app it was most likely shared in.
  *
- * @returns {Promise<string[]>} distinct channel ids
+ * @returns {Promise<Array<{source: string, lastSeen: string}>>} newest first
  */
 async function previewAppsForLink(linkId) {
   const { rows } = await query(
-    `SELECT DISTINCT source
+    `SELECT source, MAX(created_at) AS last_seen
        FROM clicks
       WHERE link_id = @link_id
         AND is_bot = 1
-        AND source_method = 'crawler'`,
+        AND source_method = 'crawler'
+      GROUP BY source
+      ORDER BY last_seen DESC`,
     { link_id: linkId }
   );
-  return rows.map((r) => r.source);
+  return rows.map((r) => ({ source: r.source, lastSeen: r.last_seen }));
 }
 
 // `refined = 0` makes this idempotent: a replayed or duplicated beacon cannot

@@ -304,17 +304,38 @@ const METHOD_LABELS = {
  * app has ever previewed this link, an unattributable human click on it very
  * likely came from that app.
  *
- * Deliberately refuses to guess when two or more apps previewed the same link —
- * there is no way to tell which chat the click came out of, and inventing a
- * split would be worse than admitting it is unknown.
+ * When the same link has been shared to several apps, the most recent preview
+ * wins: sharing to Telegram on Monday and WhatsApp on Friday means Friday's
+ * clicks are far more likely to be WhatsApp's. That is a guess about ordering,
+ * not a measurement, which is why it stays `low` confidence and is labelled
+ * "likely" in the UI.
  *
- * @param {string[]} previewApps Distinct channel ids that crawled this link.
+ * Still refuses to guess when two apps previewed the link within
+ * AMBIGUOUS_WINDOW_MS of each other — pasting the same link into two chats in
+ * one sitting leaves genuinely no way to order the clicks that follow, and a
+ * coin flip dressed up as an answer is worse than admitting it is unknown.
+ *
+ * @param {Array<{source: string, lastSeen: string}>} previewApps Newest first.
  * @returns {?{source: string, method: string, confidence: string}}
  */
+const AMBIGUOUS_WINDOW_MS = 15 * 60 * 1000;
+
 function attributeFromPreviews(previewApps) {
-  const candidates = [...new Set((previewApps || []).filter((a) => a && a !== 'other'))];
-  if (candidates.length !== 1) return null;
-  return { source: candidates[0], method: 'preview-match', confidence: 'low' };
+  const candidates = (previewApps || []).filter((p) => p && p.source && p.source !== 'other');
+  if (!candidates.length) return null;
+
+  const attribute = (source) => ({ source, method: 'preview-match', confidence: 'low' });
+  if (candidates.length === 1) return attribute(candidates[0].source);
+
+  // SQLite hands back "YYYY-MM-DD HH:MM:SS" in UTC with no zone marker.
+  const asTime = (value) => Date.parse(`${String(value).replace(' ', 'T')}Z`);
+  const sorted = [...candidates].sort((a, b) => asTime(b.lastSeen) - asTime(a.lastSeen));
+  const [newest, runnerUp] = sorted;
+
+  const gap = asTime(newest.lastSeen) - asTime(runnerUp.lastSeen);
+  if (!Number.isFinite(gap) || gap < AMBIGUOUS_WINDOW_MS) return null;
+
+  return attribute(newest.source);
 }
 
 /**
