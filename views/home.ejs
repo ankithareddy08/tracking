@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<%- include('partials/nav', { active: 'home' }) %>
+
+<main class="wrap">
+
+  <section class="hero">
+    <h1>Turn any link into a tracked link</h1>
+    <p>Paste a URL and get <strong>one</strong> tracking link. Share it anywhere &mdash; WhatsApp, Instagram, Google, anywhere &mdash; and it works out which platform each visitor came from on its own.</p>
+  </section>
+
+  <% if (error) { %>
+    <div class="alert"><%= error %></div>
+  <% } %>
+
+  <form class="card create" method="post" action="/app/links">
+    <label class="field">
+      <span class="field-label">Destination URL</span>
+      <input
+        type="text"
+        name="destination"
+        placeholder="https://example.com/landing-page"
+        value="<%= form.destination || '' %>"
+        autocomplete="off"
+        autofocus
+        required>
+    </label>
+
+    <div class="row">
+      <label class="field">
+        <span class="field-label">Label <em>optional</em></span>
+        <input type="text" name="title" placeholder="Summer campaign" value="<%= form.title || '' %>" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Custom short code <em>optional</em></span>
+        <div class="prefixed">
+          <span class="prefix"><%= baseUrl.replace(/^https?:\/\//, '') %>/</span>
+          <input type="text" name="custom_slug" placeholder="summer" value="<%= form.custom_slug || '' %>" autocomplete="off">
+        </div>
+      </label>
+    </div>
+
+    <button class="btn primary" type="submit">Create tracking link</button>
+  </form>
+
+  <section class="panel detect-note">
+    <h3>What one link can detect</h3>
+    <div class="detect-grid">
+      <div>
+        <span class="badge exact">detected</span>
+        <p>
+          Google, Bing, Facebook, Twitter/X, LinkedIn, Reddit, Pinterest, YouTube &mdash;
+          plus Instagram, TikTok, Snapchat, WeChat and WhatsApp <strong>when opened from their mobile app</strong>
+          (their in-app browser identifies itself).
+        </p>
+      </div>
+      <div>
+        <span class="badge inferred">not detectable</span>
+        <p>
+          <strong>WhatsApp on iPhone</strong>, and <strong>any link clicked on instagram.com / facebook.com in a
+          regular browser</strong> (desktop or mobile), send nothing back &mdash; those platforms strip the referrer
+          on outbound links by design. Those clicks land in <em>Other site</em> or <em>Direct</em>.
+          Add <code>?s=instagram</code>, <code>?s=whatsapp</code>, etc. to the end of your link when you share there
+          and it becomes exact.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <% if (groups.length) { %>
+    <section class="recent">
+      <div class="section-head">
+        <h2>Recent links</h2>
+        <a href="/app/dashboard" class="quiet-link">View all &rarr;</a>
+      </div>
+      <div class="list">
+        <% groups.forEach(function (g) { %>
+          <a class="list-row" href="/app/l/<%= g.group_id %>">
+            <div class="list-main">
+              <strong><%= g.title || g.destination %></strong>
+              <span class="muted mono"><%= baseUrl.replace(/^https?:\/\//, '') %>/<%= g.primary_code %></span>
+            </div>
+            <div class="list-stat">
+              <span class="big"><%= g.clicks %></span>
+              <span class="muted">clicks</span>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+    </section>
+  <% } %>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "tracking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Link tracker: shortens any URL and reports which channel visitors arrived from.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0",
+    "dotenv": "^17.2.1",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "ua-parser-js": "^2.0.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

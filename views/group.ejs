@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<%- include('partials/nav', { active: '' }) %>
+
+<main class="wrap">
+
+  <% if (justCreated) { %>
+    <div class="alert success">Links created. Copy the one that matches where you are about to share it.</div>
+  <% } %>
+
+  <section class="page-head">
+    <div>
+      <h1><%= group.title || 'Tracking link' %></h1>
+      <a class="dest" href="<%= group.destination %>" target="_blank" rel="noopener noreferrer">
+        <%= group.destination %> &nearr;
+      </a>
+    </div>
+    <form method="post" action="/app/l/<%= group.id %>/delete"
+          onsubmit="return confirm('Delete this link and all of its click history? This cannot be undone.')">
+      <button class="btn danger-ghost" type="submit">Delete</button>
+    </form>
+  </section>
+
+  <% const primary = links.find(function (l) { return !l.channel; }) || links[0]; %>
+  <% const tagged = links.filter(function (l) { return l.channel; }); %>
+
+  <section class="panel">
+    <h2>Your tracking link</h2>
+    <div class="hero-link" data-copy="<%= shortUrl(primary.code) %>" role="button" tabindex="0">
+      <code><%= shortUrl(primary.code) %></code>
+      <span class="copy-hint">Copy</span>
+    </div>
+    <p class="note">
+      Share this one link everywhere. Each visit is matched to its platform automatically.
+      <br>
+      Need certainty for WhatsApp on iPhone? Append
+      <code>?s=whatsapp</code> when you share there &mdash; any channel name works.
+    </p>
+  </section>
+
+  <% if (tagged.length) { %>
+    <section class="panel">
+      <h3>Channel-tagged variants</h3>
+      <div class="links">
+        <% tagged.forEach(function (l) { %>
+          <div class="link-row" data-copy="<%= shortUrl(l.code) %>" role="button" tabindex="0">
+            <div class="link-channel">
+              <span class="dot" style="background: <%= channelColor(l.channel) %>"></span>
+              <%= channelLabel(l.channel) %>
+            </div>
+            <code class="link-url"><%= shortUrl(l.code) %></code>
+            <div class="link-stats">
+              <span title="clicks"><strong><%= l.clicks %></strong></span>
+              <span class="muted" title="unique visitors"><%= l.visitors %> uniq</span>
+            </div>
+            <span class="copy-hint">Copy</span>
+          </div>
+        <% }); %>
+      </div>
+    </section>
+  <% } %>
+
+  <%- include('partials/report') %>
+
+</main>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head><%- include('partials/head') %></head>
+<body>
+<%- include('partials/nav', { active: 'dashboard' }) %>
+
+<main class="wrap">
+
+  <section class="page-head">
+    <h1>Dashboard</h1>
+    <a class="btn primary" href="/">New link</a>
+  </section>
+
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-value"><%= totals.links %></span>
+      <span class="stat-label">tracked URLs</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value"><%= totals.clicks %></span>
+      <span class="stat-label">clicks</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value"><%= totals.visitors %></span>
+      <span class="stat-label">unique visitors</span>
+    </div>
+    <div class="stat quiet">
+      <span class="stat-value"><%= totals.bots %></span>
+      <span class="stat-label">bots filtered out</span>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>All tracked URLs</h2>
+    <% if (!groups.length) { %>
+      <p class="empty">Nothing tracked yet. <a href="/">Create your first link.</a></p>
+    <% } else { %>
+      <div class="table-scroll">
+        <table class="rows">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Short link</th>
+              <th class="num">Clicks</th>
+              <th class="num">Visitors</th>
+              <th class="num">Links</th>
+              <th>Last click</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% groups.forEach(function (g) { %>
+              <tr onclick="location.href='/app/l/<%= g.group_id %>'">
+                <td>
+                  <strong><%= g.title || '—' %></strong>
+                  <div class="muted trunc"><%= g.destination %></div>
+                </td>
+                <td class="mono nowrap"><%= baseUrl.replace(/^https?:\/\//, '') %>/<%= g.primary_code %></td>
+                <td class="num"><%= g.clicks %></td>
+                <td class="num"><%= g.visitors %></td>
+                <td class="num"><%= g.link_count %></td>
+                <td class="mono nowrap muted"><%= g.last_click || '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <h2 class="section-title">Across all links</h2>
+  <%- include('partials/report') %>
+
+</main>
+</body>
+</html>

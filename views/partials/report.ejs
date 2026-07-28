@@ -1,0 +1,150 @@
+<% /* Expects: report, channelLabel, channelColor */ %>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>Where visitors came from</h2>
+    <span class="muted"><%= report.totalClicks %> click<%= report.totalClicks === 1 ? '' : 's' %></span>
+  </div>
+
+  <% if (!report.sources.length) { %>
+    <p class="empty">No clicks yet. Share a link above and this fills in live.</p>
+  <% } else { %>
+    <div class="bars">
+      <% report.sources.forEach(function (s) { %>
+        <div class="bar-row">
+          <div class="bar-label">
+            <span class="dot" style="background: <%= s.color %>"></span>
+            <%= s.label %>
+            <% if (s.exactShare === 100) { %>
+              <span class="badge exact" title="Every click arrived on a tagged link — measured, not inferred">exact</span>
+            <% } else if (s.reliableShare === 100) { %>
+              <span class="badge partial" title="Detected from the referrer or the in-app browser signature">detected</span>
+            <% } else if (s.reliableShare > 0) { %>
+              <span class="badge partial" title="<%= s.reliableShare %>% detected from a solid signal, the rest is a weaker guess"><%= s.reliableShare %>% solid</span>
+            <% } else { %>
+              <span class="badge inferred" title="No identifying signal — this is where undetectable traffic lands">no signal</span>
+            <% } %>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: <%= Math.max(s.share, 2) %>%; background: <%= s.color %>"></div>
+          </div>
+          <div class="bar-value">
+            <strong><%= s.clicks %></strong>
+            <span class="muted"><%= s.share %>%</span>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+</section>
+
+<% if (report.peakDay > 0) { %>
+  <section class="panel">
+    <div class="section-head">
+      <h2>Last 30 days</h2>
+      <span class="muted">peak <%= report.peakDay %>/day</span>
+    </div>
+    <div class="timeline">
+      <% report.timeline.forEach(function (d) { %>
+        <div class="tl-col" title="<%= d.day %> — <%= d.clicks %> clicks, <%= d.visitors %> visitors">
+          <div class="tl-bar" style="height: <%= d.clicks ? Math.max((d.clicks / report.peakDay) * 100, 4) : 0 %>%"></div>
+        </div>
+      <% }); %>
+    </div>
+    <div class="timeline-axis">
+      <span><%= report.timeline[0].day %></span>
+      <span><%= report.timeline[report.timeline.length - 1].day %></span>
+    </div>
+  </section>
+<% } %>
+
+<div class="grid-3">
+  <% const dims = [
+       { title: 'Device',   rows: report.devices },
+       { title: 'Browser',  rows: report.browsers },
+       { title: 'OS',       rows: report.operatingSystems },
+     ]; %>
+  <% dims.forEach(function (d) { %>
+    <section class="panel">
+      <h3><%= d.title %></h3>
+      <% if (!d.rows.length) { %>
+        <p class="empty small">&mdash;</p>
+      <% } else { %>
+        <ul class="mini-list">
+          <% const top = d.rows[0].clicks; %>
+          <% d.rows.forEach(function (r) { %>
+            <li>
+              <span class="mini-label"><%= r.value %></span>
+              <span class="mini-bar"><i style="width: <%= Math.max((r.clicks / top) * 100, 3) %>%"></i></span>
+              <span class="mini-value"><%= r.clicks %></span>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </section>
+  <% }); %>
+</div>
+
+<% if (report.referrers.length) { %>
+  <section class="panel">
+    <h3>Referring domains</h3>
+    <p class="note">Empty for most app traffic &mdash; WhatsApp, Instagram and Signal strip this header. That is expected, not a bug.</p>
+    <ul class="mini-list">
+      <% const topRef = report.referrers[0].clicks; %>
+      <% report.referrers.forEach(function (r) { %>
+        <li>
+          <span class="mini-label mono"><%= r.value %></span>
+          <span class="mini-bar"><i style="width: <%= Math.max((r.clicks / topRef) * 100, 3) %>%"></i></span>
+          <span class="mini-value"><%= r.clicks %></span>
+        </li>
+      <% }); %>
+    </ul>
+  </section>
+<% } %>
+
+<% if (report.recent.length) { %>
+  <section class="panel">
+    <h2>Recent visits</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Source</th>
+            <th>How we know</th>
+            <th>Device</th>
+            <th>Browser</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% report.recent.forEach(function (c) { %>
+            <tr>
+              <td class="mono nowrap"><%= c.created_at %></td>
+              <td>
+                <span class="dot" style="background: <%= channelColor(c.source) %>"></span>
+                <%= channelLabel(c.source) %>
+              </td>
+              <td>
+                <% const methodBadges = {
+                     'tagged':          ['exact',    'tagged link'],
+                     'referrer':        ['partial',  'referrer'],
+                     'app-referrer':    ['partial',  'app referrer'],
+                     'user-agent':      ['partial',  'in-app browser'],
+                     'client-referrer': ['partial',  'browser referrer'],
+                     'client-webview':  ['partial',  'webview detected'],
+                     'sec-fetch':       ['inferred', 'unnamed website'],
+                   };
+                   const badge = methodBadges[c.source_method] || ['inferred', 'no signal']; %>
+                <span class="badge <%= badge[0] %>" title="<%= c.confidence %> confidence"><%= badge[1] %></span>
+              </td>
+              <td><%= c.device_type || '—' %></td>
+              <td><%= c.browser || '—' %></td>
+              <td class="mono"><%= c.code %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
