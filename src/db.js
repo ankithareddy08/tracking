@@ -78,6 +78,7 @@ const ready = (async () => {
   await addColumnIfMissing('clicks', 'client_referrer', 'TEXT');
   await addColumnIfMissing('clicks', 'viewport', 'TEXT');
   await addColumnIfMissing('clicks', 'refined', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('clicks', 'requested_with', 'TEXT');
 
   // PRAGMA foreign_keys defaults off per-connection in SQLite; each new
   // connection this client opens needs it set explicitly for the clicks
@@ -215,11 +216,11 @@ async function recordClick(click) {
     `INSERT INTO clicks (
        link_id, group_id, source, source_method, confidence, referrer, referrer_domain,
        user_agent, device_type, browser, os, visitor_hash, country, language,
-       sec_fetch_site, is_bot
+       sec_fetch_site, requested_with, is_bot
      ) VALUES (
        @link_id, @group_id, @source, @source_method, @confidence, @referrer, @referrer_domain,
        @user_agent, @device_type, @browser, @os, @visitor_hash, @country, @language,
-       @sec_fetch_site, @is_bot
+       @sec_fetch_site, @requested_with, @is_bot
      )`,
     click
   );

@@ -64,13 +64,16 @@ router.get('/:code', async (req, res, next) => {
   const userAgent = req.get('user-agent') || '';
   const referrer = req.get('referer') || req.get('referrer') || null;
   const secFetchSite = req.get('sec-fetch-site') || null;
+  // Android apps announce their own package name here when the link opens in a
+  // WebView — the most direct "which app was this" signal that exists.
+  const requestedWith = req.get('x-requested-with') || null;
 
   // ?s=whatsapp lets the single link be tagged by hand when you want certainty;
   // a link minted for a channel keeps its own value.
   const queryTag = typeof req.query.s === 'string' ? req.query.s.toLowerCase() : null;
   const taggedChannel = link.channel || (queryTag && isChannel(queryTag) ? queryTag : null);
 
-  let detected = detectSource({ taggedChannel, referrer, userAgent, secFetchSite });
+  let detected = detectSource({ taggedChannel, referrer, userAgent, secFetchSite, requestedWith });
   const bot = isBot(userAgent);
 
   if (bot) {
@@ -109,6 +112,7 @@ router.get('/:code', async (req, res, next) => {
       country: countryOf(req),
       language: primaryLanguage(req),
       sec_fetch_site: secFetchSite,
+      requested_with: requestedWith ? requestedWith.slice(0, 120) : null,
       is_bot: bot ? 1 : 0,
     });
   } catch (err) {

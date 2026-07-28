@@ -118,6 +118,32 @@ const APP_REFERRER_RULES = [
   [/com\.android\.mms|com\.google\.android\.apps\.messaging/, 'sms'],
 ];
 
+/**
+ * Android package name -> channel, for the X-Requested-With header.
+ *
+ * Android WebViews (and, on older Chrome versions, Custom Tabs) announce the
+ * host app's package name in this header. When it is present it is the single
+ * best signal available on mobile: the app names itself outright, even though
+ * it sent no referrer and no branded User-Agent.
+ *
+ * Newer Chrome restricts the header for privacy, so treat its absence as
+ * normal rather than as a failure.
+ *
+ * @returns {?string}
+ */
+function fromRequestedWith(requestedWith) {
+  if (!requestedWith) return null;
+  // Some apps send just "XMLHttpRequest" here; that is not a package name.
+  if (!/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i.test(requestedWith.trim())) return null;
+
+  for (const [pattern, channel] of APP_REFERRER_RULES) {
+    if (pattern.test(requestedWith)) return channel;
+  }
+  // A package name we do not recognise still proves this was opened inside
+  // *some* app rather than a browser, which beats calling it a direct visit.
+  return 'other';
+}
+
 /* ------------------------------------------------------------------ *
  * In-app browser User-Agent -> channel
  * ------------------------------------------------------------------ */
@@ -239,6 +265,8 @@ function fromUserAgent(userAgent) {
  */
 const CONFIDENCE = {
   tagged: 'exact',
+  'requested-with': 'high',
+  'requested-with-app': 'medium',
   referrer: 'high',
   'app-referrer': 'high',
   'user-agent': 'high',
@@ -253,6 +281,8 @@ const CONFIDENCE = {
 /** Human-readable explanation of each method, for tooltips. */
 const METHOD_LABELS = {
   tagged: 'Link was tagged with the channel',
+  'requested-with': 'The Android app named itself in X-Requested-With',
+  'requested-with-app': 'Opened inside an app, but its package name is unrecognised',
   referrer: 'Referer header matched a known site',
   'app-referrer': 'Native app package sent as referrer',
   'user-agent': 'Recognised in-app browser',
@@ -295,11 +325,12 @@ function attributeFromPreviews(previewApps) {
  * @param {?string} input.referrer      Raw Referer header.
  * @param {?string} input.userAgent     Raw User-Agent header.
  * @param {?string} input.secFetchSite  Sec-Fetch-Site header, if the browser sent one.
+ * @param {?string} input.requestedWith X-Requested-With header (Android package name).
  * @returns {{source, method, confidence, referrerDomain, conclusive}}
  *   `conclusive` tells the redirect handler whether it is worth asking the
  *   browser for more signals before giving up on this visit.
  */
-function detectSource({ taggedChannel, referrer, userAgent, secFetchSite }) {
+function detectSource({ taggedChannel, referrer, userAgent, secFetchSite, requestedWith }) {
   const referrerDomain = referrer ? hostnameOf(referrer) : null;
   const finish = (source, method) => ({
     source,
@@ -310,6 +341,13 @@ function detectSource({ taggedChannel, referrer, userAgent, secFetchSite }) {
   });
 
   if (taggedChannel && isChannel(taggedChannel)) return finish(taggedChannel, 'tagged');
+
+  // Checked before the referrer: when an Android app names its own package it
+  // is stating which app the link opened from, which beats inferring it.
+  const viaRequestedWith = fromRequestedWith(requestedWith);
+  if (viaRequestedWith && viaRequestedWith !== 'other') {
+    return finish(viaRequestedWith, 'requested-with');
+  }
 
   const isAppReferrer = referrer && !/^https?:\/\//i.test(referrer);
   const viaReferrer = fromReferrer(referrer);
@@ -322,6 +360,11 @@ function detectSource({ taggedChannel, referrer, userAgent, secFetchSite }) {
 
   // A referrer we do not recognise still beats calling it direct.
   if (viaReferrer === 'other') return finish('other', 'referrer');
+
+  // An unrecognised package name at least proves this was inside *some* app.
+  // Left non-conclusive on purpose so the preview-match fallback still gets a
+  // chance to put a name to it.
+  if (viaRequestedWith === 'other') return finish('other', 'requested-with-app');
 
   // No referrer at all, but the browser told us the navigation came from another
   // site. That rules out "typed the URL" even though the site hid its identity,
