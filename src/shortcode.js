@@ -43,4 +43,45 @@ function isReserved(code) {
   return RESERVED_CODES.has(String(code).toLowerCase());
 }
 
-module.exports = { randomCode, validateSlug, isReserved, CODE_LENGTH };
+/**
+ * Derive a readable short-code hint from a destination URL, so a link to
+ * flashbackai.xyz/welcome defaults to /welcome instead of a random string.
+ * Falls back to the hostname's main label when the path is empty (a bare
+ * homepage link), and returns null when neither yields anything usable — the
+ * caller falls back to a fully random code in that case.
+ *
+ * @param {string} destination A URL already validated by normalizeDestination.
+ * @returns {?string}
+ */
+function deriveSlugHint(destination) {
+  let url;
+  try {
+    url = new URL(destination);
+  } catch {
+    return null;
+  }
+
+  let lastSegment = url.pathname.split('/').filter(Boolean).pop();
+  if (lastSegment) {
+    // Decode %20 etc. before slugifying — otherwise the digits inside an
+    // encoded byte (the "20" in "%20") leak into the slug as literal text.
+    try {
+      lastSegment = decodeURIComponent(lastSegment);
+    } catch {
+      /* malformed escape sequence — fall through with the raw segment */
+    }
+  }
+  const hostLabel = url.hostname.replace(/^www\./, '').split('.')[0];
+  const raw = lastSegment || hostLabel || '';
+
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+
+  if (slug.length < 2 || isReserved(slug)) return null;
+  return slug;
+}
+
+module.exports = { randomCode, validateSlug, isReserved, deriveSlugHint, CODE_LENGTH };

@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const { createClient } = require('@libsql/client');
 
 const { DB_PATH, TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, IP_SALT } = require('./config');
-const { randomCode, isReserved } = require('./shortcode');
+const { randomCode, isReserved, deriveSlugHint } = require('./shortcode');
 
 // Same client, two modes: a local file when TURSO_DATABASE_URL is unset (local
 // dev, or any host with real persistent disk), a hosted libSQL database when it
@@ -146,6 +146,24 @@ async function allocateCode() {
 }
 
 /**
+ * Prefer a code that reads like the destination (e.g. "/welcome" for
+ * flashbackai.xyz/welcome) over a random one. Tries the plain hint, then a
+ * few numbered variants, and only falls back to a fully random code once
+ * those are exhausted — a link with a distinctive path rarely collides.
+ */
+async function allocateCodeFor(destination) {
+  const hint = deriveSlugHint(destination);
+  if (hint) {
+    if (!(await codeExists(hint))) return hint;
+    for (let n = 2; n <= 9; n += 1) {
+      const candidate = `${hint}-${n}`;
+      if (!(await codeExists(candidate))) return candidate;
+    }
+  }
+  return allocateCode();
+}
+
+/**
  * Create a tracking link group: one auto-detect link plus one link per channel.
  *
  * Code allocation happens first (sequential lookups — the tiny residual race
@@ -165,7 +183,7 @@ async function createLinkGroup({ destination, title, channels, customSlug }) {
 
   const groupId = crypto.randomUUID();
   const rows = [
-    { code: customSlug || (await allocateCode()), channel: null },
+    { code: customSlug || (await allocateCodeFor(destination)), channel: null },
     ...(await Promise.all(channels.map(async (channel) => ({ code: await allocateCode(), channel })))),
   ];
 

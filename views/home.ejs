@@ -34,10 +34,10 @@
         <input type="text" name="title" placeholder="Summer campaign" value="<%= form.title || '' %>" autocomplete="off">
       </label>
       <label class="field">
-        <span class="field-label">Custom short code <em>optional</em></span>
+        <span class="field-label">Custom short code <em>optional &mdash; auto-picked from your URL if left blank</em></span>
         <div class="prefixed">
           <span class="prefix"><%= baseUrl.replace(/^https?:\/\//, '') %>/</span>
-          <input type="text" name="custom_slug" placeholder="summer" value="<%= form.custom_slug || '' %>" autocomplete="off">
+          <input type="text" name="custom_slug" placeholder="e.g. welcome" value="<%= form.custom_slug || '' %>" autocomplete="off">
         </div>
       </label>
     </div>
